@@ -1,8 +1,13 @@
+import os
+
 import numpy as np
 from dataclasses import dataclass
 from random import randint, random, uniform, sample
 import math
 from copy import deepcopy as dc
+import datetime
+import pickle
+from pathlib import Path
 
 
 @dataclass
@@ -23,16 +28,26 @@ class Chromosome:
 
     def __str__(self):
         # return f"Chromosome(lambda={self.max_node}, delta={self.node_percent})"
-        layers = [math.ceil(max_node * percent) for max_node, percent in zip(self.max_node, self.node_percent)]
-        return f"Chromosome(id={self.id}, layers={layers}, score={self.fitness_score})"
+        layers = self.get_layers()
+        return f"Chromosome(id={self.id}, layers={layers}, RMSE={self.RMSE}, score={self.fitness_score})"
 
     def update_RMSE(self, RMSE):
         self.RMSE = RMSE
 
 
+    def zero_exist(self):
+        layers = self.get_layers()
+        if 0 in layers:
+            return True
+        return False
+
+    def get_layers(self):
+        return [int(math.ceil(max_node * percent)) for max_node, percent in zip(self.max_node, self.node_percent)]
+
+
 class GeneticAlgorithm:
-    def __init__(self, population, winning_percentage=0.1, layer_range=(2, 6), node_range=(32, 256),
-                 mutation_rate=0.3):
+    def __init__(self, population=50, winning_percentage=0.1, layer_range=(2, 6), node_range=(32, 256),
+                 mutation_rate=0.3, store_path="./GA", save_freq=3):
         """
         This class handles all activities of the Genetic Algorithm, including mutation, crossover, initialization...
         Make sure the initial population is large enough to not become too homogenous
@@ -46,27 +61,59 @@ class GeneticAlgorithm:
         self.layer_range = layer_range
         self.node_range = node_range
         self.mu = mutation_rate
+        self.store_path = store_path
         self.epoch = 0
-        self.history = ""
+        # self.history = ""
+        self.start_time = datetime.datetime.now()
+        self.start_time = self.start_time.strftime("%Y-%m-%d %H:%M:%S").replace(" ", "_").replace(":", "-")
+        self.save_freq = save_freq
         self.chromosomes = list()
         self.chromosome_generator()
-        self.history += str(self)
-        print(str(self))
+        # self.history += str(self)
+        # print(str(self))
+        now = self.start_time
+        with open("GA.txt", "a") as text_file:
+            text_file.write(f'=========================={now}==========================\n')
 
     def __str__(self):
-        message = f"Genetic Algorithm Epoch {self.epoch}: \n"
+        message = f"Genetic Algorithm Epoch {self.epoch-1}: \n"
         for chromosome in self.chromosomes:
             message += str(chromosome) + ", "
         message += "\n"
         return message
+
+    @staticmethod
+    def load(file_path):
+        # file_path = file_path + '.pkl'
+        if not os.path.exists(file_path):
+            print(f"This file/directory {file_path} doesn't exist.")
+            return
+        with open(file_path, 'rb') as f:
+            loaded_object = pickle.load(f)
+        return loaded_object
+
+    def save(self, latest=False):
+        now = self.start_time
+        now += f'_Epoch-{self.epoch-1}'
+        if latest:
+            now = "latest"
+        Path(self.store_path).mkdir(parents=True, exist_ok=True)
+        with open(f'{self.store_path}/{now}.pkl', 'wb') as f:
+            pickle.dump(self, f)
 
     def save_history(self):
         """
         This function save the GA history to a txt file
         :return:
         """
-        with open("GA.txt", "w") as text_file:
-            text_file.write(self.history)
+        # now = datetime.datetime.now()
+        # now = now.strftime("%Y-%m-%d %H:%M:%S")
+        with open("GA.txt", "a") as text_file:
+            text_file.write(str(self))
+
+
+    def print_history(self):
+        print(self.history)
 
     def chromosome_generator(self):
         """
@@ -134,14 +181,14 @@ class GeneticAlgorithm:
         for chromosome in self.chromosomes:
             tan = 0
             for i in range(chromosome.num_layer-1):
-                if math.ceil(chromosome.max_node[i] * chromosome.node_percent[i]) <= math.ceil(
+                if math.ceil(chromosome.max_node[i] * chromosome.node_percent[i]) >= math.ceil( # <=
                         chromosome.max_node[i + 1] * chromosome.node_percent[i + 1]):
                     tan += 1
             chromosome.tan = tan
             tan_0 = min(tan, tan_0)
         for chromosome in self.chromosomes:
             phi = chromosome.tan / (chromosome.num_layer - 1) + tan_0
-            chromosome.fitness_score = phi / chromosome.RMSE
+            chromosome.fitness_score = phi / chromosome.RMSE # minimize knowledge abstraction?
 
     def selection(self, breeding_ratio=0.6):
         """
@@ -155,6 +202,7 @@ class GeneticAlgorithm:
         winning_chromosomes = sorted_chromosomes[:math.ceil(self.population * 0.1)]
         breeding_chromosomes = sorted_chromosomes[math.ceil(self.population * 0.1):]
         weight = np.array([i.fitness_score for i in breeding_chromosomes])
+        weight += 0.1 ## preventing zero case
         weight = weight / np.sum(weight)
         parents = np.random.choice(np.arange(len(breeding_chromosomes)),
                                    size=math.ceil(len(breeding_chromosomes) * breeding_ratio) +
@@ -176,6 +224,11 @@ class GeneticAlgorithm:
         index = np.random.permutation(index)
         return [(index[i], index[i + 1]) for i in range(0, breeding_size, 2)]
 
+    def winner(self):
+        sorted_chromosomes = sorted(self.chromosomes, key=lambda item: item.fitness_score, reverse=True)
+        return sorted_chromosomes[0]
+
+
     def step(self):
         self.update_fitness()
         winning_chromosomes, breeding_chromosomes, non_breeding_chromosomes = self.selection()
@@ -187,7 +240,14 @@ class GeneticAlgorithm:
         for i in range(len(non_winning_chromosomes)):
             non_winning_chromosomes[i] = self.mutation(non_winning_chromosomes[i])
         new_chromosomes = winning_chromosomes + non_winning_chromosomes
+        for chromosome in new_chromosomes: # check if there are layer with zero node, mutate it until no zero layer
+            while chromosome.zero_exist():
+                self.mutation(chromosome)
         self.epoch += 1
         self.chromosomes = new_chromosomes
-        self.history += str(self)
+        # self.history += str(self)
+        if self.epoch % self.save_freq == 0:
+            self.save()
+        self.save(latest=True)
+        self.save_history()
         print(str(self))
