@@ -14,13 +14,13 @@ from pathlib import Path
 class Chromosome:
     """
     The chromosome class implement the unit of one individual in the Genetic Algorithm. It contains information
-    including: number of layer, number of maximum possible node in each layer (lambda), the sigma that represent the
-    percentage of actual number of nodes allowed ceil(lambda x sigma), the root mean square error of the chromosome,
+    including: number of layer, number of maximum possible node in each layer (lambda), the delta that represent the
+    percentage of actual number of nodes allowed ceil(lambda x delta), the root mean square error of the chromosome,
     the fitness score, the knowledge abstraction level, and the id of the chromosome
 
     :param num_layer: the number of layer
     :param max_node: (lambda) a list of maximum possible number of nodes in each layer
-    :param node_percent: (sigma) a list of percentage (0,1] multiply with (lambda) to get the actual number of node and floor to get the actual number of node in a layer
+    :param node_percent: (delta) a list of percentage (0,1] multiply with (lambda) to get the actual number of node and floor to get the actual number of node in a layer
     :param RMSE: the root mean square error
     :param fitness_score: The fitness score
     :param tan: the knowledge abstraction level
@@ -65,7 +65,7 @@ class Chromosome:
 
     def get_layers(self):
         """
-        This function calculates the number of nodes in each layers by: ceil(lambda x sigma).
+        This function calculates the number of nodes in each layers by: ceil(lambda x delta).
 
         :return: the list containing number of nodes for each layer
         """
@@ -178,11 +178,11 @@ class GeneticAlgorithm:
     @staticmethod
     def crossover(chromosome_a, chromosome_b):
         """
-        This function performs the crossover operation for the lambda (max_node) and sigma (node_percent) between
+        This function performs the crossover operation for the lambda (max_node) and delta (node_percent) between
         chromosome_a and chromosome_b.
 
-        Since sigma (node_percent) is a list of integer and lambda (max_node) is treated as a list of binary,
-        integer crossover and single point crossover is performed on lambda and sigma, respectively.
+        Since delta (node_percent) is a list of integer and lambda (max_node) is treated as a list of binary,
+        integer crossover and single point crossover is performed on lambda and delta, respectively.
 
         Integer crossover
 
@@ -203,7 +203,7 @@ class GeneticAlgorithm:
             selected_layer = randint(i, math.ceil(i + p))  # select a layer in A with range [i,i+p] to crossover with b
             selected_layer = min(chromosome_a.num_layer-1, selected_layer)
             # Crossover between layer
-            # get the lambda and sigma
+            # get the lambda and delta
             delta_a, delta_b = chromosome_a.node_percent[i], chromosome_b.node_percent[i]
             lamda_a, lamda_b = bin(chromosome_a.max_node[i])[2:], bin(chromosome_b.max_node[i])[2:]
             # integer crossover
@@ -220,7 +220,7 @@ class GeneticAlgorithm:
         This function mutate the max_node and node_percent with mutation ratio mu_lamda and mu_delta, which have range
         [0, 0.3].
         The lambda is mutated by randomly toggling random number of bit = mu_lamda x max_bit.
-        The sigma is mutated by randomly add a random float of range = [-mu_delta, mu_delta]
+        The delta is mutated by randomly add a random float of range = [-mu_delta, mu_delta]
 
         :param chromosome: the target Chromosome
         :return: the mutated Chromosome itself
