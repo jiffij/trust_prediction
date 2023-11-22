@@ -6,8 +6,31 @@ from tqdm import tqdm
 
 
 class seMLP:
+    """
+    The seMLP class contains and initializes the Genetic Algorithm class and the MLP class. The training of the
+    seMLP is handled by this class.
+    It consists of four member functions: :func:`train_one_epoch`, func:`validate_one_epoch`, :func:`forward`,
+    :func:`run`.
+    Mean Square Error loss and Adam are used in the implementation.
+
+    :param train_loader: The train loader to train each MLP
+    :param test_loader: The testing loader to evaluate the RMSE and fitness score of each chromosome
+    :param in_features: The number of input features (sliding window size)
+    :param train_epoch: The number of training epoch for each chromosome (MLP)
+    :param lr: The learning rate
+    :param ga_path: Specify the path to a pickle file to load a stored checkpoint
+    :param population: The initial population of the GA algorithm
+    :param winning_percentage: The percentage of winner, which remains unchanged, in each generation
+    :param layer_range: The span of possible number of layers for each chromosome
+    :param node_range: The span of possible number of nodes for each MLP linear layer
+    :param mutation_rate: The probability of each chromosome being mutated
+    :param store_path: The path to store the GA checkpoint
+    :param save_freq: The frequency to save a checkpoint
+    :param weight_decay: The weight decay weight
+    """
     def __init__(self, train_loader, test_loader, in_features, train_epoch=100, lr=0.001, ga_path="", population=30, winning_percentage=0.1, layer_range=(2, 6),
                  node_range=(32, 255), mutation_rate=0.3, store_path="./GA", save_freq=3, weight_decay=0.001):
+
         if ga_path == "":
             self.GA = GeneticAlgorithm(population, winning_percentage, layer_range, node_range,
                                        mutation_rate, store_path, save_freq)
@@ -22,6 +45,15 @@ class seMLP:
         self.weight_decay = weight_decay
 
     def train_one_epoch(self, model, epoch, criterion, optimizer):
+        """
+        This function train a MLP model one epoch.
+
+        :param model: The MLP model created
+        :param epoch: The current epoch
+        :param criterion: The loss function
+        :param optimizer: The optimizer
+        :return:
+        """
         model.train()
         # print(f'Epoch: {epoch + 1}')
         losses = 0.0
@@ -50,9 +82,10 @@ class seMLP:
 
     def validate_one_epoch(self, model, criterion):
         """
+        This function test the model with the test set and return the RMSE
 
-        :param mlp:
-        :param criterion:
+        :param model: the MLP model
+        :param criterion: loss function
         :return: the RMSE of the testing samples
         """
         model.eval()
@@ -80,6 +113,13 @@ class seMLP:
         return mlp
 
     def forward(self, in_features, out_features):
+        """
+        This function handle one training iteration of a generation.
+
+        :param in_features: number of input feature (window size)
+        :param out_features: number of output feature, 1 (tomorrow)
+        :return:
+        """
         for i in range(self.GA.population):
             chromosome = self.GA.chromosomes[i]
             mlp = MLP(in_features, out_features, chromosome.get_layers())
@@ -97,6 +137,12 @@ class seMLP:
         self.GA.step()
 
     def run(self, ga_epoch, curr_ga_epoch=0):
+        """
+        This function run the main loop of the seMLP algorithm.
+        :param ga_epoch: The number of generation being trained
+        :param curr_ga_epoch: To restart from a generation
+        :return:
+        """
         for i in tqdm(range(curr_ga_epoch, ga_epoch)):
             self.forward(self.in_features, 1)
         self.GA.save_history()

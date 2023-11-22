@@ -4,7 +4,17 @@ import numpy as np
 
 
 class MLP(nn.Module):
+    """
+    This class implements the MLP part of the seMLP, where the number of layer and number of nodes in each layer are
+    dynamic, which is decided by the GA algorithm
+    :param in_features: number of input features, equals to the window size of the time-delayed difference
+    :param out_features: number of output feature, usually 1 (tomorrow price difference) in this case
+    :param layers: a list of hidden layers and their number of nodes, i.e. [156, 149]
+    :param activation: the activation function used, usually ReLU for min max [0,1] scaling
+    :param prune_percentile:
+    """
     def __init__(self, in_features, out_features, layers, activation='relu', prune_percentile=0.0):
+
         super(MLP, self).__init__()
 
         # Create the linear layers
@@ -61,6 +71,11 @@ class MLP(nn.Module):
         self.linear1.weight.masked_fill_(abs_weights < percentile_threshold, 0.0)
 
     def forward(self, x):
+        """
+        The forward propagation
+        :param x: the input tensor
+        :return: the output tensor
+        """
         # Pass the input through the first linear layer and activation function
         # x = self.linear1(x)
         # x = self.activation(x)
